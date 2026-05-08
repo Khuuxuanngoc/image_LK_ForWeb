@@ -1,0 +1,63 @@
+javascript:(function() {
+    let imgUrl = '';
+    const host = window.location.hostname;
+
+    if (host.includes('lcsc.com')) {
+        /* 1. Thử tìm trong div có style background-image (cấu trúc mới bạn gửi) */
+        const bgDivs = document.querySelectorAll('div.v-image__image');
+        for (let div of bgDivs) {
+            const bg = div.style.backgroundImage;
+            if (bg && bg.includes('assets.lcsc.com/images')) {
+                imgUrl = bg.slice(5, -2).replace(/"/g, "");
+                break;
+            }
+        }
+
+        /* 2. Nếu không thấy, thử tìm mã sản phẩm từ link magnifier hoặc img tag */
+        if (!imgUrl) {
+            const lcscLink = document.querySelector('a.magnifierMarkLink');
+            if (lcscLink && lcscLink.href) {
+                const match = lcscLink.href.match(/product-image\/(C\d+)\.html/);
+                if (match) imgUrl = `https://wmsc.lcsc.com/wmsc/upload/product/${match[1]}.jpg`;
+            }
+        }
+    } else if (host.includes('taobao.com')) {
+        const zoomDiv = document.querySelector('.js-image-zoom__zoomed-image');
+        if (zoomDiv && zoomDiv.style.backgroundImage) {
+            imgUrl = zoomDiv.style.backgroundImage.slice(5, -2).replace(/"/g, "");
+        } else {
+            const mainImg = document.querySelector('.main-pic img, #J_ImgBooth');
+            if (mainImg) imgUrl = mainImg.src;
+        }
+    }
+
+    if (imgUrl && imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+
+    if (!imgUrl) {
+        alert('Không tìm thấy ảnh gốc! Bạn hãy thử click vào ảnh nhỏ để ảnh lớn hiện ra rồi bấm lại bookmarklet.');
+        return;
+    }
+
+    const fileName = prompt('Nhập tên hình ảnh muốn lưu:', 'san-pham');
+    if (fileName) {
+        /* Xử lý tên file: chữ thường, gạch ngang thay khoảng trắng */
+        const cleanName = fileName.trim().toLowerCase().replace(/\s+/g, '-') + '.jpg';
+        
+        fetch(imgUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = cleanName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(() => {
+                /* Nếu bị chặn CORS, mở tab mới để lưu thủ công */
+                window.open(imgUrl, '_blank');
+            });
+    }
+})();
